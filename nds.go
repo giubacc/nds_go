@@ -22,16 +22,22 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"nds/peer"
 )
 
-var cf peer.Cfg
+var cfg peer.Cfg
 
 func main() {
-	var test = flag.String("test", "default", "test description")
+	flag.BoolVar(&cfg.StartNode, "n", false, "spawn a new node")
+	flag.StringVar(&cfg.MulticastAddress, "j", "232.232.200.82", "join the cluster at specified multicast group")
+	flag.UintVar(&cfg.MulticastPort, "jp", 8745, "join the cluster at specified multicast group")
+	flag.UintVar(&cfg.ListeningPort, "p", 31582, "listen on the specified port")
+
+	flag.StringVar(&cfg.LogType, "l", "console", "specify logging type [console (default), file name]")
+	flag.StringVar(&cfg.LogLevel, "v", "info", "specify logging verbosity [off, trace, info (default), warn, err]")
+
+	flag.StringVar(&cfg.Val, "set", "", "set the value shared across the cluster")
+	flag.BoolVar(&cfg.GetVal, "get", false, "get the value shared across the cluster")
 
 	flag.Parse()
-
-	fmt.Printf("hello %s", *test)
 }
