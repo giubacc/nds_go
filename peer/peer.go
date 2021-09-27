@@ -79,6 +79,10 @@ func (p *Peer) processNodeStatus() util.RetCode {
 	return util.RetCode_OK
 }
 
-func (p *Peer) foreignEvent() bool {
+func (p *Peer) foreignEvent(evt *util.Event) bool {
+	return true
+}
+
+func (p *Peer) processForeignEvent(evt *util.Event) bool {
 	return true
 }
