@@ -18,26 +18,4 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-package main
-
-import (
-	"flag"
-	"nds/peer"
-)
-
-var pr peer.Peer
-
-func main() {
-	flag.BoolVar(&pr.Cfg.StartNode, "n", false, "spawn a new node")
-	flag.StringVar(&pr.Cfg.MulticastAddress, "j", "232.232.200.82", "join the cluster at specified multicast group")
-	flag.UintVar(&pr.Cfg.MulticastPort, "jp", 8745, "join the cluster at specified multicast group")
-	flag.UintVar(&pr.Cfg.ListeningPort, "p", 31582, "listen on the specified port")
-
-	flag.StringVar(&pr.Cfg.LogType, "l", "console", "specify logging type [console (default), file name]")
-	flag.StringVar(&pr.Cfg.LogLevel, "v", "info", "specify logging verbosity [off, trace, info (default), warn, err]")
-
-	flag.StringVar(&pr.Cfg.Val, "set", "", "set the value shared across the cluster")
-	flag.BoolVar(&pr.Cfg.GetVal, "get", false, "get the value shared across the cluster")
-
-	flag.Parse()
-}
+package net
