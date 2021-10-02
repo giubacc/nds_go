@@ -40,4 +40,5 @@ func main() {
 	flag.BoolVar(&pr.Cfg.GetVal, "get", false, "get the value shared across the cluster")
 
 	flag.Parse()
+	pr.Run()
 }

@@ -21,25 +21,21 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 package peer
 
 import (
+	"nds/net"
 	"nds/util"
+	"time"
 )
 
-type Config struct {
-	StartNode        bool
-	MulticastAddress string
-	MulticastPort    uint
-	ListeningPort    uint
-	Val              string
-	GetVal           bool
-
-	LogType  string
-	LogLevel string
-}
+const NodeSynchDuration = 2
 
 type Peer struct {
+	//configuration
+	Cfg util.Config
 
-	//the configuration
-	Cfg Config
+	//the time point at which this node will generate itself the timestamp;
+	//this will happen if no other node will respond to initial alive sent by this node.
+	//not daemon nodes ("pure" setter or getter nodes) will shutdown at this time point.
+	TpInitialSynchWindow time.Time
 
 	//the currently timestamp set by this node
 	CurrentNodeTS uint32
@@ -53,30 +49,78 @@ type Peer struct {
 
 	//exit required
 	ExitRequired bool
+
+	//network selector
+	selector net.Selector
+
+	//logger
+	logger util.Logger
 }
 
-func (p *Peer) Run() int {
-	return 0
+func (p *Peer) Run() util.RetCode {
+	var rcode util.RetCode = util.RetCode_OK
+
+	rcode = p.init()
+	if rcode != util.RetCode_OK {
+		return rcode
+	}
+
+	rcode = p.start()
+	if rcode != util.RetCode_OK {
+		return rcode
+	}
+
+	p.processEvents()
+
+	return rcode
 }
 
 func (p *Peer) init() util.RetCode {
-	return util.RetCode_OK
+	var rcode util.RetCode = util.RetCode_OK
+
+	//logger init
+	p.logger.Init("peer.", p.Cfg)
+
+	//seconds before this node will auto generate the timestamp
+	p.TpInitialSynchWindow = time.Now().Add(time.Second * NodeSynchDuration)
+
+	p.selector.Cfg = p.Cfg
+
+	return rcode
 }
 
 func (p *Peer) start() util.RetCode {
-	return util.RetCode_OK
+	var rcode util.RetCode = util.RetCode_OK
+
+	p.logger.Trace("start selector")
+	go p.selector.Run()
+	p.logger.Trace("wait selector go selecting")
+
+	return rcode
 }
 
 func (p *Peer) stop() util.RetCode {
-	return util.RetCode_OK
+	var rcode util.RetCode = util.RetCode_OK
+
+	p.logger.Stop()
+	return rcode
 }
 
-func (p *Peer) processIncomingEvents() util.RetCode {
-	return util.RetCode_OK
+func (p *Peer) processEvents() util.RetCode {
+	var rcode util.RetCode = util.RetCode_OK
+
+	for !p.ExitRequired {
+		p.logger.Trace("processing events...")
+		time.Sleep(time.Second * 2)
+	}
+
+	return rcode
 }
 
 func (p *Peer) processNodeStatus() util.RetCode {
-	return util.RetCode_OK
+	var rcode util.RetCode = util.RetCode_OK
+
+	return rcode
 }
 
 func (p *Peer) foreignEvent(evt *util.Event) bool {

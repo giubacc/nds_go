@@ -33,11 +33,11 @@ type AliveMsg struct {
 }
 
 func (msg *AliveMsg) UnmarshalJSON(buffer []byte) error {
-	err := json.Unmarshal(buffer, msg)
-	if err != nil {
-		//fmt.Println("error:", err)
-	}
-	return err
+	return json.Unmarshal(buffer, msg)
+}
+
+func (msg *AliveMsg) MarshalJSON() ([]byte, error) {
+	return json.Marshal(msg)
 }
 
 /**
@@ -53,4 +53,12 @@ type DataMsg struct {
 	Dv string `json:"_dv"`
 	Pt string `json:"_pt"`
 	Ts uint64 `json:"_ts"`
+}
+
+func (msg *DataMsg) UnmarshalJSON(buffer []byte) error {
+	return json.Unmarshal(buffer, msg)
+}
+
+func (msg *DataMsg) MarshalJSON() ([]byte, error) {
+	return json.Marshal(msg)
 }

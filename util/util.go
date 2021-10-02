@@ -69,6 +69,18 @@ const (
 	RetCode_PARTPKT = 404 /**< partial packet */
 )
 
+type Config struct {
+	StartNode        bool
+	MulticastAddress string
+	MulticastPort    uint
+	ListeningPort    uint
+	Val              string
+	GetVal           bool
+
+	LogType  string
+	LogLevel string
+}
+
 /**
  * event type
  */
