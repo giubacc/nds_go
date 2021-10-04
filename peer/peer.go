@@ -53,6 +53,9 @@ type Peer struct {
 	//network selector
 	selector net.Selector
 
+	//network acceptor
+	acceptor net.Acceptor
+
 	//logger
 	logger util.Logger
 }
@@ -84,6 +87,7 @@ func (p *Peer) init() util.RetCode {
 	//seconds before this node will auto generate the timestamp
 	p.TpInitialSynchWindow = time.Now().Add(time.Second * NodeSynchDuration)
 
+	p.acceptor.Cfg = p.Cfg
 	p.selector.Cfg = p.Cfg
 
 	return rcode
@@ -92,7 +96,11 @@ func (p *Peer) init() util.RetCode {
 func (p *Peer) start() util.RetCode {
 	var rcode util.RetCode = util.RetCode_OK
 
-	p.logger.Trace("start selector")
+	p.logger.Trace("starting acceptor")
+	go p.acceptor.Run()
+	p.logger.Trace("wait acceptor go accepting")
+
+	p.logger.Trace("starting selector")
 	go p.selector.Run()
 	p.logger.Trace("wait selector go selecting")
 
