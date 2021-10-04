@@ -1,0 +1,29 @@
+version: '3.4'
+
+services:
+  adapter:
+    build:
+      context: ./docker_compose
+      dockerfile: Dockerfile
+    
+    networks:
+      nds_devcontainer_vsnds:
+        ipv4_address: 172.22.0.202
+      
+    volumes:
+      - //var/run/docker.sock:/var/run/docker.sock
+      - ~/.ssh:/home/vscode/.ssh:cached
+      - ..:/workspaces/nds_go:cached
+
+    cap_add:
+      - SYS_PTRACE
+    security_opt:
+      - seccomp:unconfined
+
+    # Overrides default command so things don't shut down after the process ends.
+    command: /bin/sh -c "while sleep 1000; do :; done"
+
+networks:
+  nds_devcontainer_vsnds:
+    external: true
+    

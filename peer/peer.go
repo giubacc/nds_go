@@ -44,7 +44,7 @@ type Peer struct {
 	//a successful synch with the cluster will transit DesiredClusterTS into CurrentNodeTS.
 	DesiredClusterTS uint32
 
-	//the value shared across the cluser
+	//the value shared across the cluster
 	Data string
 
 	//exit required

@@ -1,0 +1,29 @@
+// For format details, see https://aka.ms/vscode-remote/devcontainer.json or this file's README at:
+// https://github.com/microsoft/vscode-dev-containers/tree/v0.112.0/containers/cpp
+
+{
+	"name": "nds_go",
+	"dockerComposeFile": ["docker-compose-master.yml"],
+	"service": "adapter",
+	"workspaceFolder": "/workspaces/nds_go",
+	"shutdownAction": "stopCompose",
+	
+	// Set *default* container specific settings.json values on container create.
+	"settings": {
+		"terminal.integrated.profiles.linux": {
+			"bash (login)": {
+			  "path": "/bin/bash"
+			}
+		}
+	},
+
+	// Add the IDs of extensions you want installed when the container is created.
+	"extensions": [
+		"golang.go",
+		"ms-azuretools.vscode-docker",
+		"eamodio.gitlens"
+	],
+
+	// See https://aka.ms/vscode-remote/containers/non-root.
+	"remoteUser": "vscode"
+}
