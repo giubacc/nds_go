@@ -21,8 +21,9 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 package peer
 
 import (
-	"nds/net"
+	"nds/network"
 	"nds/util"
+	"net"
 	"time"
 )
 
@@ -50,11 +51,8 @@ type Peer struct {
 	//exit required
 	ExitRequired bool
 
-	//network selector
-	selector net.Selector
-
 	//network acceptor
-	acceptor net.Acceptor
+	acceptor network.Acceptor
 
 	//logger
 	logger util.Logger
@@ -88,7 +86,6 @@ func (p *Peer) init() util.RetCode {
 	p.TpInitialSynchWindow = time.Now().Add(time.Second * NodeSynchDuration)
 
 	p.acceptor.Cfg = p.Cfg
-	p.selector.Cfg = p.Cfg
 
 	return rcode
 }
@@ -100,9 +97,7 @@ func (p *Peer) start() util.RetCode {
 	go p.acceptor.Run()
 	p.logger.Trace("wait acceptor go accepting")
 
-	p.logger.Trace("starting selector")
-	go p.selector.Run()
-	p.logger.Trace("wait selector go selecting")
+	//@fixme
 
 	return rcode
 }
@@ -116,12 +111,18 @@ func (p *Peer) stop() util.RetCode {
 
 func (p *Peer) processEvents() util.RetCode {
 	var rcode util.RetCode = util.RetCode_OK
+	p.logger.Trace("start processing events ...")
 
 	for !p.ExitRequired {
-		p.logger.Trace("processing events...")
-		time.Sleep(time.Second * 2)
+
+		select {
+		case conn := <-util.EnteringChan:
+			p.sendDataMessage(conn)
+		}
+
 	}
 
+	p.logger.Trace("end process events")
 	return rcode
 }
 
@@ -137,4 +138,23 @@ func (p *Peer) foreignEvent(evt *util.Event) bool {
 
 func (p *Peer) processForeignEvent(evt *util.Event) bool {
 	return true
+}
+
+func (p *Peer) buildDataMessage() ([]byte, error) {
+	msg := util.DataMsg{Dv: p.Data, Pt: util.MsgPktTypeData, Ts: uint64(p.CurrentNodeTS)}
+	return msg.MarshalJSON()
+}
+
+func (p *Peer) sendDataMessage(conn net.Conn) error {
+	msg, err := p.buildDataMessage()
+	if err != nil {
+		p.logger.Err("building data:%s", err.Error())
+		return err
+	}
+	sent, err := conn.Write(msg)
+	if err != nil {
+		p.logger.Err("sending data:%s", err.Error())
+	}
+	p.logger.Trace("sent %d bytes to: %s", sent, conn.RemoteAddr().String())
+	return err
 }

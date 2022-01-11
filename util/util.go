@@ -20,6 +20,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 package util
 
+import "net"
+
 type RetCode int
 
 const (
@@ -112,3 +114,7 @@ type Event struct {
 	Evt      EvtType
 	OptSrcIp string
 }
+
+var (
+	EnteringChan = make(chan net.Conn)
+)

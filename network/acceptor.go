@@ -1,10 +1,9 @@
-package net
+package network
 
 import (
 	"fmt"
 	"nds/util"
 	"net"
-	"time"
 )
 
 type AcceptorStatus int
@@ -19,7 +18,7 @@ const (
 )
 
 type Acceptor struct {
-	//configuration
+	//parent
 	Cfg util.Config
 
 	//status
@@ -80,16 +79,16 @@ func (a *Acceptor) accept() {
 		}
 	}
 
+	a.logger.Trace("accepting ...")
 	a.Status = AcceptorStatus_ACCEPT
-
 	for a.Status == AcceptorStatus_ACCEPT {
-		a.logger.Trace("accepting...")
-
-		_, err := a.listener.Accept()
+		conn, err := a.listener.Accept()
 		if err != nil {
-			a.logger.Trace("err:%s, accepting connection ...", err.Error())
+			a.logger.Err("err:%s, accepting connection ...", err.Error())
+		} else {
+			a.logger.Trace("connection accepted")
+			util.EnteringChan <- conn
 		}
-
-		time.Sleep(time.Second * 2)
 	}
+	a.logger.Trace("stop accepting")
 }
