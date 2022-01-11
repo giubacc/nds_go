@@ -20,7 +20,9 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 package util
 
-import "net"
+import (
+	"fmt"
+)
 
 type RetCode int
 
@@ -71,6 +73,14 @@ const (
 	RetCode_PARTPKT = 404 /**< partial packet */
 )
 
+type NDSError struct {
+	Code RetCode
+}
+
+func (e *NDSError) Error() string {
+	return fmt.Sprintf("NDSError:%d", e.Code)
+}
+
 type Config struct {
 	StartNode        bool
 	MulticastAddress string
@@ -114,7 +124,3 @@ type Event struct {
 	Evt      EvtType
 	OptSrcIp string
 }
-
-var (
-	EnteringChan = make(chan net.Conn)
-)

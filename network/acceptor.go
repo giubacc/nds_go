@@ -1,3 +1,23 @@
+/* Original Work Copyright (c) 2021 Giuseppe Baccini - giuseppe.baccini@live.com
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of
+this software and associated documentation files (the "Software"), to deal in
+the Software without restriction, including without limitation the rights to
+use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software is furnished to do so,
+subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+*/
+
 package network
 
 import (
@@ -18,8 +38,8 @@ const (
 )
 
 type Acceptor struct {
-	//parent
-	Cfg util.Config
+	//config
+	Cfg *util.Config
 
 	//status
 	Status AcceptorStatus
@@ -30,48 +50,37 @@ type Acceptor struct {
 	//listener
 	listener net.Listener
 
+	//channel used to serve incoming TCP connections
+	EnteringChan chan net.Conn
+
 	//logger
 	logger util.Logger
 }
 
-func (a *Acceptor) Run() util.RetCode {
-	var rcode util.RetCode = util.RetCode_OK
-
-	rcode = a.init()
-	if rcode != util.RetCode_OK {
-		return rcode
+func (a *Acceptor) Run() error {
+	if err := a.init(); err != nil {
+		return err
 	}
-
 	a.accept()
-
-	rcode = a.stop()
-	return rcode
+	return a.stop()
 }
 
-func (a *Acceptor) init() util.RetCode {
-	var rcode util.RetCode = util.RetCode_OK
-
+func (a *Acceptor) init() error {
 	a.lport = a.Cfg.ListeningPort
 
 	//logger init
-	a.logger.Init("acpt.", a.Cfg)
-
-	return rcode
+	err := a.logger.Init("acpt.", a.Cfg)
+	return err
 }
 
-func (a *Acceptor) stop() util.RetCode {
-	var rcode util.RetCode = util.RetCode_OK
-
-	a.listener.Close()
-	return rcode
+func (a *Acceptor) stop() error {
+	return a.listener.Close()
 }
 
 func (a *Acceptor) accept() {
-
 	for {
 		var err error
-		a.listener, err = net.Listen("tcp", fmt.Sprintf("%s%d", ":", a.lport))
-		if err == nil {
+		if a.listener, err = net.Listen("tcp", fmt.Sprintf("%s%d", ":", a.lport)); err == nil {
 			break
 		} else {
 			a.lport++
@@ -82,12 +91,11 @@ func (a *Acceptor) accept() {
 	a.logger.Trace("accepting ...")
 	a.Status = AcceptorStatus_ACCEPT
 	for a.Status == AcceptorStatus_ACCEPT {
-		conn, err := a.listener.Accept()
-		if err != nil {
+		if conn, err := a.listener.Accept(); err != nil {
 			a.logger.Err("err:%s, accepting connection ...", err.Error())
 		} else {
 			a.logger.Trace("connection accepted")
-			util.EnteringChan <- conn
+			a.EnteringChan <- conn
 		}
 	}
 	a.logger.Trace("stop accepting")

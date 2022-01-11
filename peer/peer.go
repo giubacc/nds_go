@@ -54,82 +54,91 @@ type Peer struct {
 	//network acceptor
 	acceptor network.Acceptor
 
+	//multicast manager
+	mcastHelper network.MCastHelper
+
+	//channel used to serve incoming TCP connections
+	EnteringChan chan net.Conn
+
 	//logger
 	logger util.Logger
 }
 
-func (p *Peer) Run() util.RetCode {
-	var rcode util.RetCode = util.RetCode_OK
+func (p *Peer) Run() error {
 
-	rcode = p.init()
-	if rcode != util.RetCode_OK {
-		return rcode
+	if err := p.init(); err != nil {
+		return err
 	}
 
-	rcode = p.start()
-	if rcode != util.RetCode_OK {
-		return rcode
+	if err := p.start(); err != nil {
+		return err
 	}
 
-	p.processEvents()
+	if p.Cfg.Val != "" {
+		p.Data = p.Cfg.Val
+		p.DesiredClusterTS = uint32(time.Now().Unix())
+		p.CurrentNodeTS = p.DesiredClusterTS
+	}
 
-	return rcode
+	return p.processEvents()
 }
 
-func (p *Peer) init() util.RetCode {
-	var rcode util.RetCode = util.RetCode_OK
-
+func (p *Peer) init() error {
 	//logger init
-	p.logger.Init("peer.", p.Cfg)
+	if err := p.logger.Init("peer.", &p.Cfg); err != nil {
+		return err
+	}
+
+	//channel used to serve incoming TCP connections
+	p.EnteringChan = make(chan net.Conn)
 
 	//seconds before this node will auto generate the timestamp
 	p.TpInitialSynchWindow = time.Now().Add(time.Second * NodeSynchDuration)
 
-	p.acceptor.Cfg = p.Cfg
+	p.acceptor.Cfg = &p.Cfg
+	p.acceptor.EnteringChan = p.EnteringChan
 
-	return rcode
+	p.mcastHelper.Cfg = &p.Cfg
+
+	return nil
 }
 
-func (p *Peer) start() util.RetCode {
-	var rcode util.RetCode = util.RetCode_OK
+func (p *Peer) start() error {
 
-	p.logger.Trace("starting acceptor")
+	p.logger.Trace("starting acceptor ...")
 	go p.acceptor.Run()
-	p.logger.Trace("wait acceptor go accepting")
+	//@fixme wait
 
-	//@fixme
+	p.logger.Trace("starting multicast ...")
+	go p.mcastHelper.Run()
+	//@fixme wait
 
-	return rcode
+	return nil
 }
 
-func (p *Peer) stop() util.RetCode {
-	var rcode util.RetCode = util.RetCode_OK
-
+func (p *Peer) stop() error {
 	p.logger.Stop()
-	return rcode
+	return nil
 }
 
-func (p *Peer) processEvents() util.RetCode {
-	var rcode util.RetCode = util.RetCode_OK
+func (p *Peer) processEvents() error {
 	p.logger.Trace("start processing events ...")
 
 	for !p.ExitRequired {
 
 		select {
-		case conn := <-util.EnteringChan:
+		case conn := <-p.EnteringChan:
 			p.sendDataMessage(conn)
 		}
 
 	}
 
 	p.logger.Trace("end process events")
-	return rcode
+	return nil
 }
 
-func (p *Peer) processNodeStatus() util.RetCode {
-	var rcode util.RetCode = util.RetCode_OK
-
-	return rcode
+func (p *Peer) processNodeStatus() error {
+	return nil
 }
 
 func (p *Peer) foreignEvent(evt *util.Event) bool {
@@ -146,15 +155,17 @@ func (p *Peer) buildDataMessage() ([]byte, error) {
 }
 
 func (p *Peer) sendDataMessage(conn net.Conn) error {
-	msg, err := p.buildDataMessage()
-	if err != nil {
+
+	if msg, err := p.buildDataMessage(); err != nil {
 		p.logger.Err("building data:%s", err.Error())
 		return err
+	} else {
+		sent, err := conn.Write(msg)
+		if err != nil {
+			p.logger.Err("sending data:%s", err.Error())
+		}
+		p.logger.Trace("sent %d bytes to: %s", sent, conn.RemoteAddr().String())
 	}
-	sent, err := conn.Write(msg)
-	if err != nil {
-		p.logger.Err("sending data:%s", err.Error())
-	}
-	p.logger.Trace("sent %d bytes to: %s", sent, conn.RemoteAddr().String())
-	return err
+
+	return nil
 }
