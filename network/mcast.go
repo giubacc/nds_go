@@ -22,6 +22,7 @@ package network
 
 import (
 	"context"
+	"encoding/binary"
 	"fmt"
 	"nds/util"
 	"net"
@@ -47,6 +48,10 @@ type MCastHelper struct {
 	//incoming multicast connection
 	iPktConn  net.PacketConn
 	iNPktConn *ipv4.PacketConn
+
+	//channels used to send/receive alive messages (UDP multicast)
+	AliveChanIncoming chan string
+	AliveChanOutgoing chan string
 }
 
 func (m *MCastHelper) init() error {
@@ -103,6 +108,15 @@ func (m *MCastHelper) establish_multicast() error {
 		return err
 	}
 
+	if err := m.iNPktConn.SetControlMessage(ipv4.FlagSrc, true); err != nil {
+		m.logger.Err("SetControlMessage:%s", err.Error())
+		return err
+	}
+	if err := m.iNPktConn.SetControlMessage(ipv4.FlagDst, true); err != nil {
+		m.logger.Err("SetControlMessage:%s", err.Error())
+		return err
+	}
+
 	return nil
 }
 
@@ -121,6 +135,19 @@ func (m *MCastHelper) Run() error {
 
 	if err := m.establish_multicast(); err != nil {
 		return err
+	}
+
+	//reading loop from multicast connection
+	buff := make([]byte, 1500)
+	for {
+		nread, cm, _, err := m.iNPktConn.ReadFrom(buff)
+		if err != nil {
+			m.logger.Err("ReadFrom:%s", err.Error())
+		} else {
+			m.logger.Trace("ReadFrom:%s, %d bytes read", cm.String(), nread)
+			payload := string(buff[4 : 4+binary.LittleEndian.Uint32(buff[0:])])
+			m.logger.Trace("ReadFrom:%s", payload)
+		}
 	}
 
 	return m.stop()

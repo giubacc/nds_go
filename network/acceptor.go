@@ -28,15 +28,6 @@ import (
 
 type AcceptorStatus int
 
-const (
-	AcceptorStatus_ZERO     = iota // zero status
-	AcceptorStatus_INIT            // acceptor is inited
-	AcceptorStatus_ACCEPT          // acceptor is accepting
-	AcceptorStatus_STOPPING        // acceptor is stopping
-	AcceptorStatus_STOPPED         // acceptor is stopped and can be safely disposed
-	AcceptorStatus_ERROR
-)
-
 type Acceptor struct {
 	//config
 	Cfg *util.Config
@@ -89,8 +80,7 @@ func (a *Acceptor) accept() {
 	}
 
 	a.logger.Trace("accepting ...")
-	a.Status = AcceptorStatus_ACCEPT
-	for a.Status == AcceptorStatus_ACCEPT {
+	for /*@fixme*/ {
 		if conn, err := a.listener.Accept(); err != nil {
 			a.logger.Err("err:%s, accepting connection ...", err.Error())
 		} else {
@@ -98,5 +88,6 @@ func (a *Acceptor) accept() {
 			a.EnteringChan <- conn
 		}
 	}
+
 	a.logger.Trace("stop accepting")
 }

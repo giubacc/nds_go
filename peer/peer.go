@@ -60,6 +60,10 @@ type Peer struct {
 	//channel used to serve incoming TCP connections
 	EnteringChan chan net.Conn
 
+	//channels used to send/receive alive messages (UDP multicast)
+	AliveChanIncoming chan string
+	AliveChanOutgoing chan string
+
 	//logger
 	logger util.Logger
 }
@@ -89,8 +93,9 @@ func (p *Peer) init() error {
 		return err
 	}
 
-	//channel used to serve incoming TCP connections
 	p.EnteringChan = make(chan net.Conn)
+	p.AliveChanIncoming = make(chan string)
+	p.AliveChanOutgoing = make(chan string)
 
 	//seconds before this node will auto generate the timestamp
 	p.TpInitialSynchWindow = time.Now().Add(time.Second * NodeSynchDuration)
@@ -99,6 +104,8 @@ func (p *Peer) init() error {
 	p.acceptor.EnteringChan = p.EnteringChan
 
 	p.mcastHelper.Cfg = &p.Cfg
+	p.mcastHelper.AliveChanIncoming = p.AliveChanIncoming
+	p.mcastHelper.AliveChanOutgoing = p.AliveChanOutgoing
 
 	return nil
 }
