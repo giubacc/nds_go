@@ -21,7 +21,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update \
     #
     # Install C++ tools
-    && apt-get -y install build-essential cmake automake autogen gdb-minimal libtool\
+    && apt-get -y install build-essential cmake automake autogen gdb-minimal libtool telnet\
     #
     # [Optional] Update UID/GID if needed
     && if [ "$USER_GID" != "1000" ] || [ "$USER_UID" != "1000" ]; then \
@@ -36,7 +36,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 # Configure apt and install go
-RUN wget https://golang.org/dl/go1.17.1.linux-amd64.tar.gz && tar xvf go1.17.1.linux-amd64.tar.gz
+RUN wget https://golang.org/dl/go1.17.6.linux-amd64.tar.gz && tar xvf go1.17.6.linux-amd64.tar.gz
 RUN chown -R root:root ./go && mv go /usr/local
 RUN echo "export GOPATH=/home/vscode/work" >> /home/vscode/.profile
 RUN echo "export PATH=$PATH:/usr/local/go/bin:$GOPATH/bin" >> /home/vscode/.profile

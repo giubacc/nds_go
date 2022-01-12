@@ -21,10 +21,12 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 package network
 
 import (
+	"context"
 	"fmt"
 	"nds/util"
 	"net"
 	"strings"
+	"syscall"
 
 	"golang.org/x/net/ipv4"
 )
@@ -75,12 +77,19 @@ func (m *MCastHelper) init() error {
 	return err
 }
 
+func (m *MCastHelper) stop() error {
+	if m.iPktConn != nil {
+		m.iPktConn.Close()
+	}
+	return nil
+}
+
 func (m *MCastHelper) establish_multicast() error {
 	m.logger.Trace("establishing multicast: group:%s - port:%d", m.Cfg.MulticastAddress, m.Cfg.MulticastPort)
 
-	mgroup := net.ParseIP(m.Cfg.MulticastAddress)
+	config := &net.ListenConfig{Control: mcastIncoRawConnCfg}
 
-	if iPktConn, err := net.ListenPacket("udp4", fmt.Sprintf("0.0.0.0:%d", m.Cfg.MulticastPort)); err != nil {
+	if iPktConn, err := config.ListenPacket(context.Background(), "udp4", fmt.Sprintf("0.0.0.0:%d", m.Cfg.MulticastPort)); err != nil {
 		m.logger.Err("ListenPacket:%s", err.Error())
 		return err
 	} else {
@@ -88,12 +97,21 @@ func (m *MCastHelper) establish_multicast() error {
 	}
 
 	m.iNPktConn = ipv4.NewPacketConn(m.iPktConn)
+	mgroup := net.ParseIP(m.Cfg.MulticastAddress)
 	if err := m.iNPktConn.JoinGroup(&m.inet, &net.UDPAddr{IP: mgroup}); err != nil {
 		m.logger.Err("JoinGroup:%s", err.Error())
 		return err
 	}
 
 	return nil
+}
+
+func mcastIncoRawConnCfg(network, address string, conn syscall.RawConn) error {
+	return conn.Control(func(descriptor uintptr) {
+		if err := syscall.SetsockoptInt(int(descriptor), syscall.SOL_SOCKET, syscall.SO_REUSEADDR, 1); err != nil {
+			util.DefLog().Err("SetsockoptInt:SO_REUSEADDR", err.Error())
+		}
+	})
 }
 
 func (m *MCastHelper) Run() error {
@@ -105,5 +123,5 @@ func (m *MCastHelper) Run() error {
 		return err
 	}
 
-	return nil
+	return m.stop()
 }

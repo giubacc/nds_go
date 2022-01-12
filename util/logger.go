@@ -124,3 +124,14 @@ func (lgr *Logger) Critical(format string, v ...interface{}) {
 	lgr.Lgr.SetPrefix("[" + lgr.Class + CriticalStr + "] ")
 	lgr.Lgr.Printf(format, v...)
 }
+
+var defLog Logger
+
+func DefLog() *Logger {
+	if defLog.Lgr == nil {
+		if err := defLog.Init("dflt.", &Config{LogType: "console", LogLevel: "info"}); err != nil {
+			return nil
+		}
+	}
+	return &defLog
+}
