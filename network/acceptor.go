@@ -36,10 +36,10 @@ type Acceptor struct {
 	Status AcceptorStatus
 
 	//listening port
-	lport uint
+	ListenPort uint
 
-	//listener
-	listener net.Listener
+	//Listener
+	Listener net.Listener
 
 	//channel used to serve incoming TCP connections
 	EnteringChan chan net.Conn
@@ -57,7 +57,7 @@ func (a *Acceptor) Run() error {
 }
 
 func (a *Acceptor) init() error {
-	a.lport = a.Cfg.ListeningPort
+	a.ListenPort = a.Cfg.ListeningPort
 
 	//logger init
 	err := a.logger.Init("acpt.", a.Cfg)
@@ -65,23 +65,23 @@ func (a *Acceptor) init() error {
 }
 
 func (a *Acceptor) stop() error {
-	return a.listener.Close()
+	return a.Listener.Close()
 }
 
 func (a *Acceptor) accept() {
 	for {
 		var err error
-		if a.listener, err = net.Listen("tcp", fmt.Sprintf("%s%d", ":", a.lport)); err == nil {
+		if a.Listener, err = net.Listen("tcp", fmt.Sprintf("%s%d", ":", a.ListenPort)); err == nil {
 			break
 		} else {
-			a.lport++
-			a.logger.Trace("err:%s, try auto-adjusting listening port to:%d ...", err.Error(), a.lport)
+			a.ListenPort++
+			a.logger.Trace("err:%s, try auto-adjusting listening port to:%d ...", err.Error(), a.ListenPort)
 		}
 	}
 
 	a.logger.Trace("accepting ...")
 	for /*@fixme*/ {
-		if conn, err := a.listener.Accept(); err != nil {
+		if conn, err := a.Listener.Accept(); err != nil {
 			a.logger.Err("err:%s, accepting connection ...", err.Error())
 		} else {
 			a.logger.Trace("connection accepted")

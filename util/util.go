@@ -92,35 +92,3 @@ type Config struct {
 	LogType  string
 	LogLevel string
 }
-
-/**
- * event type
- */
-type EvtType int
-
-const (
-	Undef           = iota
-	Interrupt       //generic interrupt
-	ConnectRequest  //request for TCP connection (peer -> selector)
-	IncomingConnect //new incoming TCP connection (selector -> peer)
-	SendPacket      //request to send a packet (peer -> selector)
-	PacketAvailable //foreign packet available (selector -> peer)
-	Disconnect      //connection disconnection event
-)
-
-/**
- * An event
- *
- * This struct is used as message between selector/peer.
- *
- * It can model an interrupt (Interrupt).
- * It can be used by peer thread to request selector thread to connect to TCP (ConnectRequest).
- * It can transport an incoming packet from a multicast/unicast socket (PacketAvailable).
- * It can be used by peer thread to request selector to send a packet (SendPacket).
- * It can be used by selector to inform peer thread of a received foreign packet (PacketAvailable).
- * It can be used to manage an event of disconnection (Disconnect).
- */
-type Event struct {
-	Evt      EvtType
-	OptSrcIp string
-}

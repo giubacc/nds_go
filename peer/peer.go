@@ -21,6 +21,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 package peer
 
 import (
+	"encoding/binary"
 	"nds/network"
 	"nds/util"
 	"net"
@@ -61,11 +62,16 @@ type Peer struct {
 	EnteringChan chan net.Conn
 
 	//channels used to send/receive alive messages (UDP multicast)
-	AliveChanIncoming chan string
-	AliveChanOutgoing chan string
+	AliveChanIncoming chan []byte
+	AliveChanOutgoing chan []byte
 
 	//logger
 	logger util.Logger
+}
+
+func (p *Peer) genTS() {
+	p.DesiredClusterTS = uint32(time.Now().Unix())
+	p.CurrentNodeTS = p.DesiredClusterTS
 }
 
 func (p *Peer) Run() error {
@@ -80,8 +86,7 @@ func (p *Peer) Run() error {
 
 	if p.Cfg.Val != "" {
 		p.Data = p.Cfg.Val
-		p.DesiredClusterTS = uint32(time.Now().Unix())
-		p.CurrentNodeTS = p.DesiredClusterTS
+		p.genTS()
 	}
 
 	return p.processEvents()
@@ -94,8 +99,8 @@ func (p *Peer) init() error {
 	}
 
 	p.EnteringChan = make(chan net.Conn)
-	p.AliveChanIncoming = make(chan string)
-	p.AliveChanOutgoing = make(chan string)
+	p.AliveChanIncoming = make(chan []byte)
+	p.AliveChanOutgoing = make(chan []byte)
 
 	//seconds before this node will auto generate the timestamp
 	p.TpInitialSynchWindow = time.Now().Add(time.Second * NodeSynchDuration)
@@ -131,29 +136,66 @@ func (p *Peer) stop() error {
 func (p *Peer) processEvents() error {
 	p.logger.Trace("start processing events ...")
 
-	for !p.ExitRequired {
+	interrupter := time.NewTicker(time.Second * 2)
+	defer interrupter.Stop()
 
+out:
+	for {
 		select {
+		case <-interrupter.C:
+			if err := p.processNodeStatus(); err != nil && err.Code == util.RetCode_EXIT {
+				break out
+			}
 		case conn := <-p.EnteringChan:
 			p.sendDataMessage(conn)
+		case buff := <-p.AliveChanIncoming:
+			msgUB := 4 + binary.LittleEndian.Uint32(buff[0:])
+			msgStr := string(buff[4:msgUB])
+			p.logger.Trace("evt:%s", msgStr)
+			msg := util.AliveMsg{}
+			msg.UnmarshalJSON(buff[4:msgUB])
 		}
-
 	}
 
 	p.logger.Trace("end process events")
 	return nil
 }
 
-func (p *Peer) processNodeStatus() error {
+func (p *Peer) processNodeStatus() *util.NDSError {
+	now := time.Now()
+
+	if p.ExitRequired {
+		return &util.NDSError{Code: util.RetCode_EXIT}
+	}
+
+	//"pure" setter or getter nodes must shutdown.
+	if !p.Cfg.StartNode && now.After(p.TpInitialSynchWindow) {
+		return &util.NDSError{Code: util.RetCode_EXIT}
+	}
+
+	//if no other node has still responded to initial alive, the node generates itself the timestamp
+	if p.CurrentNodeTS == 0 && p.DesiredClusterTS == 0 && now.After(p.TpInitialSynchWindow) {
+		p.genTS()
+		p.logger.Trace("auto generated timestamp: %d", p.CurrentNodeTS)
+		p.sendAliveMessage()
+	}
+
 	return nil
 }
 
-func (p *Peer) foreignEvent(evt *util.Event) bool {
-	return true
+func (p *Peer) buildAliveMessage() ([]byte, error) {
+	msg := util.AliveMsg{Lp: uint16(p.acceptor.ListenPort), Pt: util.MsgPktTypeAlive, Si: p.acceptor.Listener.Addr().String(), Ts: uint64(p.CurrentNodeTS)}
+	return msg.MarshalJSON()
 }
 
-func (p *Peer) processForeignEvent(evt *util.Event) bool {
-	return true
+func (p *Peer) sendAliveMessage() error {
+	if msg, err := p.buildAliveMessage(); err != nil {
+		p.logger.Err("building alive msg:%s", err.Error())
+		return err
+	} else {
+		p.AliveChanOutgoing <- msg
+	}
+	return nil
 }
 
 func (p *Peer) buildDataMessage() ([]byte, error) {
@@ -164,12 +206,12 @@ func (p *Peer) buildDataMessage() ([]byte, error) {
 func (p *Peer) sendDataMessage(conn net.Conn) error {
 
 	if msg, err := p.buildDataMessage(); err != nil {
-		p.logger.Err("building data:%s", err.Error())
+		p.logger.Err("building data msg:%s", err.Error())
 		return err
 	} else {
 		sent, err := conn.Write(msg)
 		if err != nil {
-			p.logger.Err("sending data:%s", err.Error())
+			p.logger.Err("sending data msg:%s", err.Error())
 		}
 		p.logger.Trace("sent %d bytes to: %s", sent, conn.RemoteAddr().String())
 	}

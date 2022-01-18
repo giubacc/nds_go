@@ -22,7 +22,6 @@ package network
 
 import (
 	"context"
-	"encoding/binary"
 	"fmt"
 	"nds/util"
 	"net"
@@ -50,8 +49,8 @@ type MCastHelper struct {
 	iNPktConn *ipv4.PacketConn
 
 	//channels used to send/receive alive messages (UDP multicast)
-	AliveChanIncoming chan string
-	AliveChanOutgoing chan string
+	AliveChanIncoming chan []byte
+	AliveChanOutgoing chan []byte
 }
 
 func (m *MCastHelper) init() error {
@@ -123,9 +122,16 @@ func (m *MCastHelper) establish_multicast() error {
 func mcastIncoRawConnCfg(network, address string, conn syscall.RawConn) error {
 	return conn.Control(func(descriptor uintptr) {
 		if err := syscall.SetsockoptInt(int(descriptor), syscall.SOL_SOCKET, syscall.SO_REUSEADDR, 1); err != nil {
-			util.DefLog().Err("SetsockoptInt:SO_REUSEADDR", err.Error())
+			util.DefLog().Err("SetsockoptInt:SO_REUSEADDR - %s", err.Error())
 		}
 	})
+}
+
+func (m *MCastHelper) mcastSender() {
+	for {
+		//buff := <-m.AliveChanOutgoing
+		//m.iNPktConn.WriteTo()
+	}
 }
 
 func (m *MCastHelper) Run() error {
@@ -137,16 +143,18 @@ func (m *MCastHelper) Run() error {
 		return err
 	}
 
+	//start mcast sender
+	go m.mcastSender()
+
 	//reading loop from multicast connection
-	buff := make([]byte, 1500)
 	for {
+		buff := make([]byte, 1500)
 		nread, cm, _, err := m.iNPktConn.ReadFrom(buff)
 		if err != nil {
 			m.logger.Err("ReadFrom:%s", err.Error())
 		} else {
 			m.logger.Trace("ReadFrom:%s, %d bytes read", cm.String(), nread)
-			payload := string(buff[4 : 4+binary.LittleEndian.Uint32(buff[0:])])
-			m.logger.Trace("ReadFrom:%s", payload)
+			m.AliveChanIncoming <- buff
 		}
 	}
 

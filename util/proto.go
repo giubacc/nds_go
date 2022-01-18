@@ -62,7 +62,7 @@ func (msg *AliveMsg) UnmarshalJSON(buffer []byte) error {
 }
 
 func (msg *AliveMsg) MarshalJSON() ([]byte, error) {
-	return json.Marshal(msg)
+	return json.Marshal(*msg)
 }
 
 /**
