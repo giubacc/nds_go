@@ -22,6 +22,8 @@ package network
 
 import (
 	"context"
+	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	"nds/util"
 	"net"
@@ -48,8 +50,11 @@ type MCastHelper struct {
 	iPktConn  net.PacketConn
 	iNPktConn *ipv4.PacketConn
 
+	//outgoing multicast info
+	outgPktUDPAddr net.UDPAddr
+
 	//channels used to send/receive alive messages (UDP multicast)
-	AliveChanIncoming chan []byte
+	AliveChanIncoming chan util.AliveMsg
 	AliveChanOutgoing chan []byte
 }
 
@@ -102,7 +107,9 @@ func (m *MCastHelper) establish_multicast() error {
 
 	m.iNPktConn = ipv4.NewPacketConn(m.iPktConn)
 	mgroup := net.ParseIP(m.Cfg.MulticastAddress)
-	if err := m.iNPktConn.JoinGroup(&m.inet, &net.UDPAddr{IP: mgroup}); err != nil {
+	m.outgPktUDPAddr = net.UDPAddr{IP: mgroup, Port: int(m.Cfg.MulticastPort)}
+
+	if err := m.iNPktConn.JoinGroup(&m.inet, &m.outgPktUDPAddr); err != nil {
 		m.logger.Err("JoinGroup:%s", err.Error())
 		return err
 	}
@@ -129,8 +136,12 @@ func mcastIncoRawConnCfg(network, address string, conn syscall.RawConn) error {
 
 func (m *MCastHelper) mcastSender() {
 	for {
-		//buff := <-m.AliveChanOutgoing
-		//m.iNPktConn.WriteTo()
+		buff := <-m.AliveChanOutgoing
+		if nsent, err := m.iNPktConn.WriteTo(buff, nil, &m.outgPktUDPAddr); err != nil {
+			m.logger.Err("WriteTo:%s", err.Error())
+		} else {
+			m.logger.Trace("WriteTo:%s, %d bytes sent", m.outgPktUDPAddr.String(), nsent)
+		}
 	}
 }
 
@@ -154,7 +165,13 @@ func (m *MCastHelper) Run() error {
 			m.logger.Err("ReadFrom:%s", err.Error())
 		} else {
 			m.logger.Trace("ReadFrom:%s, %d bytes read", cm.String(), nread)
-			m.AliveChanIncoming <- buff
+			msgUB := 4 + binary.LittleEndian.Uint32(buff[0:])
+			msg := util.AliveMsg{}
+			if err := json.Unmarshal(buff[4:msgUB], &msg); err != nil {
+				m.logger.Err("Unmarshal:%s", err.Error())
+			}
+			msg.Si = cm.Src.String()
+			m.AliveChanIncoming <- msg
 		}
 	}
 

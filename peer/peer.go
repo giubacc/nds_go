@@ -62,7 +62,7 @@ type Peer struct {
 	EnteringChan chan net.Conn
 
 	//channels used to send/receive alive messages (UDP multicast)
-	AliveChanIncoming chan []byte
+	AliveChanIncoming chan util.AliveMsg
 	AliveChanOutgoing chan []byte
 
 	//logger
@@ -99,7 +99,7 @@ func (p *Peer) init() error {
 	}
 
 	p.EnteringChan = make(chan net.Conn)
-	p.AliveChanIncoming = make(chan []byte)
+	p.AliveChanIncoming = make(chan util.AliveMsg)
 	p.AliveChanOutgoing = make(chan []byte)
 
 	//seconds before this node will auto generate the timestamp
@@ -148,12 +148,11 @@ out:
 			}
 		case conn := <-p.EnteringChan:
 			p.sendDataMessage(conn)
-		case buff := <-p.AliveChanIncoming:
-			msgUB := 4 + binary.LittleEndian.Uint32(buff[0:])
-			msgStr := string(buff[4:msgUB])
-			p.logger.Trace("evt:%s", msgStr)
-			msg := util.AliveMsg{}
-			msg.UnmarshalJSON(buff[4:msgUB])
+		case msg := <-p.AliveChanIncoming:
+			p.logger.Trace("msg:%v", msg)
+			if err := p.processAliveMsg(msg); err != nil && err.Code == util.RetCode_EXIT {
+				break out
+			}
 		}
 	}
 
@@ -183,6 +182,38 @@ func (p *Peer) processNodeStatus() *util.NDSError {
 	return nil
 }
 
+func (p *Peer) processAliveMsg(msg util.AliveMsg) *util.NDSError {
+
+	if p.CurrentNodeTS == 0 && msg.Ts == 0 {
+		p.logger.Trace("discarding alive evt from other newly spawned node: this node is still synching")
+		return nil
+	}
+
+	if p.CurrentNodeTS > uint32(msg.Ts) {
+		if p.CurrentNodeTS == p.DesiredClusterTS {
+			p.logger.Trace("other node is not updated: [this_ts > other_ts], notifying it ...")
+			p.sendAliveMessage()
+		}
+		// else {
+		//   this node is already synching with the cluster; do not send potentially useless alive.
+		// }
+	} else if p.CurrentNodeTS < uint32(msg.Ts) {
+		if p.DesiredClusterTS < uint32(msg.Ts) {
+			p.DesiredClusterTS = uint32(msg.Ts)
+			p.logger.Trace("this node is not updated: [this_ts < other_ts], requesting updated data ...")
+			//@todo
+		}
+		// else {
+		//   already requested to someone else, do nothing
+		// }
+	}
+	// else {
+	//   equals, do nothing
+	// }
+
+	return nil
+}
+
 func (p *Peer) buildAliveMessage() ([]byte, error) {
 	msg := util.AliveMsg{Lp: uint16(p.acceptor.ListenPort), Pt: util.MsgPktTypeAlive, Si: p.acceptor.Listener.Addr().String(), Ts: uint64(p.CurrentNodeTS)}
 	return msg.MarshalJSON()
@@ -193,7 +224,10 @@ func (p *Peer) sendAliveMessage() error {
 		p.logger.Err("building alive msg:%s", err.Error())
 		return err
 	} else {
-		p.AliveChanOutgoing <- msg
+		outgBuff := make([]byte, len(msg)+4)
+		binary.LittleEndian.PutUint32(outgBuff[0:4], uint32(len(msg)))
+		copy(outgBuff[4:], msg)
+		p.AliveChanOutgoing <- outgBuff
 	}
 	return nil
 }
